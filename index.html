@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Do By Friday - Topic Connection Maps</title>
+  <meta name="description" content="Interactive topic connection maps for the Do By Friday podcast. Explore how topics, people, and ideas connect across episodes.">
+  <meta property="og:title" content="Do By Friday - Topic Connection Maps">
+  <meta property="og:description" content="Interactive maps of everything discussed on the show.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1 class="site-title" id="site-title">Do By Friday</h1>
+    <p class="site-tagline" id="site-tagline">Topic Connection Maps</p>
+    <p class="site-hosts">with <span id="site-hosts">Alex Cox &amp; Merlin Mann</span></p>
+  </header>
+
+  <main class="main-content">
+    <p class="episode-count" id="episode-count"></p>
+    <div class="episode-grid" id="episode-grid">
+      <p class="error-message">Loading episodes...</p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>Built with <a href="https://d3js.org">D3.js</a>. View on <a href="https://github.com/alexcoxfm/dobyfridaymindmaps">GitHub</a>.</p>
+  </footer>
+
+  <script>
+    function formatDate(dateStr) {
+      const date = new Date(dateStr + 'T00:00:00');
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+
+    function renderEpisodes(data) {
+      const grid = document.getElementById('episode-grid');
+      const countEl = document.getElementById('episode-count');
+
+      // Update header from podcast metadata
+      if (data.podcast) {
+        if (data.podcast.name) {
+          document.getElementById('site-title').textContent = data.podcast.name;
+        }
+        if (data.podcast.tagline) {
+          document.getElementById('site-tagline').textContent = data.podcast.tagline;
+        }
+        if (data.podcast.hosts) {
+          document.getElementById('site-hosts').textContent = data.podcast.hosts.join(' & ');
+        }
+      }
+
+      const episodes = data.episodes || [];
+      if (episodes.length === 0) {
+        grid.innerHTML = '<p class="error-message">No episodes yet. Check back soon!</p>';
+        return;
+      }
+
+      // Sort newest first
+      episodes.sort(function(a, b) { return b.number - a.number; });
+
+      countEl.textContent = episodes.length + (episodes.length === 1 ? ' episode' : ' episodes') + ' mapped';
+
+      grid.innerHTML = '';
+      episodes.forEach(function(ep) {
+        var card = document.createElement('a');
+        card.href = 'episodes/' + ep.number + '.html';
+        card.className = 'episode-card';
+        card.innerHTML =
+          '<span class="episode-number">#' + ep.number + '</span>' +
+          '<h2>' + escapeHtml(ep.title) + '</h2>' +
+          '<p class="episode-date">' + formatDate(ep.date) + '</p>' +
+          '<p class="episode-description">' + escapeHtml(ep.description) + '</p>' +
+          '<span class="view-link">View Map &rarr;</span>';
+        grid.appendChild(card);
+      });
+    }
+
+    function escapeHtml(str) {
+      var div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    fetch('episodes.json')
+      .then(function(response) {
+        if (!response.ok) throw new Error('Failed to load episodes');
+        return response.json();
+      })
+      .then(renderEpisodes)
+      .catch(function() {
+        document.getElementById('episode-grid').innerHTML =
+          '<p class="error-message">Could not load episodes. Try refreshing the page.</p>';
+      });
+  </script>
+</body>
+</html>

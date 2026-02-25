@@ -1,0 +1,16 @@
+{
+  "podcast": {
+    "name": "Do By Friday",
+    "tagline": "Interactive maps of everything discussed on the show",
+    "hosts": ["Alex Cox", "Merlin Mann"],
+    "website": "https://dobyfriday.com"
+  },
+  "episodes": [
+    {
+      "number": 441,
+      "title": "Episode 441",
+      "date": "2026-02-21",
+      "description": "75 topics mapped: Scoop, Nirvanna the Band, Kea parrots, MASH, Prince Andrew, Kill Bill intermissions, and more."
+    }
+  ]
+}
