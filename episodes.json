@@ -1,0 +1,16 @@
+{
+  "podcast": {
+    "name": "Do By Friday",
+    "tagline": "Interactive maps of everything discussed on the show",
+    "hosts": ["Alex Cox", "Merlin Mann"],
+    "website": "https://dobyfriday.com"
+  },
+  "episodes": [
+    {
+      "number": 441,
+      "title": "Episode 441",
+      "date": "2026-02-21",
+      "description": "Topic connection map for episode 441."
+    }
+  ]
+}
