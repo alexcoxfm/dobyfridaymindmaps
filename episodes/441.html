@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Do By Friday #441 — Topic Connection Map</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+  }
+  svg { display: block; width: 100%; height: 100%; }
+  #title {
+    position: absolute; top: 16px; left: 20px; z-index: 10; color: #fff;
+  }
+  #title .eyebrow {
+    font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: #888; margin-bottom: 4px;
+  }
+  #title h1 {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; margin: 0;
+  }
+  #title .hint {
+    font-size: 10px; color: #666; margin-top: 6px;
+  }
+  #legend {
+    position: absolute; top: 16px; right: 20px; z-index: 10;
+    display: flex; flex-wrap: wrap; gap: 6px 14px; max-width: 340; justify-content: flex-end;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 5px;
+  }
+  .legend-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .legend-label {
+    font-size: 9px; color: #aaa; letter-spacing: 0.05em; white-space: nowrap;
+  }
+  #hover-info {
+    position: absolute; bottom: 20px; left: 20px; z-index: 10;
+    background: rgba(10,10,15,0.92); border-radius: 6px; padding: 10px 14px;
+    max-width: 280; display: none; backdrop-filter: blur(4px);
+  }
+  #hover-info .name { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+  #hover-info .meta { font-size: 10px; color: #888; }
+  #stats {
+    position: absolute; bottom: 20px; right: 20px; z-index: 10;
+    color: #444; font-size: 9px; text-align: right;
+  }
+  .link-label {
+    font-size: 7px; fill: #999; pointer-events: none; text-anchor: middle;
+  }
+  .node-label {
+    font-weight: 600; pointer-events: none; paint-order: stroke; stroke-linejoin: round;
+  }
+</style>
+</head>
+<body>
+<div id="title">
+  <div class="eyebrow">Do By Friday #441</div>
+  <h1>Topic Connection Map</h1>
+  <div class="hint">Hover nodes to see connections · Drag to rearrange · Scroll to zoom</div>
+  <a href="../index.html" style="display:inline-block;margin-top:10px;font-size:11px;color:#58a6ff;text-decoration:none;letter-spacing:0.02em;">&larr; All Episodes</a>
+</div>
+<div id="legend"></div>
+<div id="hover-info">
+  <div class="name"></div>
+  <div class="meta"></div>
+</div>
+<div id="stats"></div>
+<svg id="graph"></svg>
+<script>
+const CATEGORIES = {
+  film:    { color: "#e63946", label: "Film / TV" },
+  music:   { color: "#f77f00", label: "Music" },
+  person:  { color: "#2a9d8f", label: "Person" },
+  place:   { color: "#264653", label: "Place" },
+  topic:   { color: "#7209b7", label: "Topic / Bit" },
+  animal:  { color: "#52b788", label: "Animal / Nature" },
+  tech:    { color: "#4361ee", label: "Tech / Internet" },
+  theater: { color: "#d62828", label: "Theater" },
+  podcast: { color: "#fb8500", label: "Podcast / Media" },
+};
+const nodes = [
+  { id: "nirvanna", label: "Nirvanna the Band\nthe Show the Movie", cat: "film", size: 18 },
+  { id: "blackberry", label: "BlackBerry", cat: "film", size: 14 },
+  { id: "scoop", label: "Scoop", cat: "film", size: 16 },
+  { id: "knightstale", label: "A Knight's Tale", cat: "film", size: 10 },
+  { id: "killbill", label: "Kill Bill\n(Whole Bloody Affair)", cat: "film", size: 12 },
+  { id: "hateful8", label: "The Hateful Eight\n(Netflix cut)", cat: "film", size: 9 },
+  { id: "mash_film", label: "MASH (1970)", cat: "film", size: 14 },
+  { id: "holmesyoyo", label: "Holmes & Yoyo", cat: "film", size: 15 },
+  { id: "makinit", label: "Makin' It\n(1979)", cat: "film", size: 14 },
+  { id: "gah", label: "Greatest\nAmerican Hero", cat: "film", size: 13 },
+  { id: "snf", label: "Saturday\nNight Fever", cat: "film", size: 10 },
+  { id: "awil", label: "American Werewolf\nin London", cat: "film", size: 10 },
+  { id: "soundofmusic", label: "The Sound\nof Music", cat: "film", size: 13 },
+  { id: "mastercommander", label: "Master and\nCommander", cat: "film", size: 11 },
+  { id: "jurassicpark", label: "Jurassic Park", cat: "film", size: 10 },
+  { id: "diplomat", label: "The Diplomat", cat: "film", size: 8 },
+  { id: "trainspotting", label: "Trainspotting", cat: "film", size: 9 },
+  { id: "dawsonscreek", label: "Dawson's Creek", cat: "film", size: 8 },
+  { id: "lword", label: "The L Word", cat: "film", size: 8 },
+  { id: "manmoon", label: "Man on the Moon", cat: "film", size: 8 },
+  { id: "mash_tv", label: "M*A*S*H\n(TV series)", cat: "film", size: 10 },
+  { id: "watershipdown", label: "Watership Down", cat: "film", size: 7 },
+  { id: "defunctland", label: "Defunctland", cat: "podcast", size: 12 },
+  { id: "mattjohnson", label: "Matt Johnson", cat: "person", size: 12 },
+  { id: "rufussewell", label: "Rufus Sewell", cat: "person", size: 14 },
+  { id: "gillian", label: "Gillian Anderson", cat: "person", size: 11 },
+  { id: "billiepiper", label: "Billie Piper", cat: "person", size: 9 },
+  { id: "princeandrew", label: "Prince Andrew", cat: "person", size: 13 },
+  { id: "heathledger", label: "Heath Ledger", cat: "person", size: 10 },
+  { id: "jimcarrey", label: "Jim Carrey", cat: "person", size: 8 },
+  { id: "tarantino", label: "Tarantino", cat: "person", size: 11 },
+  { id: "johnschuck", label: "John Schuck", cat: "person", size: 12 },
+  { id: "naughton", label: "David Naughton", cat: "person", size: 11 },
+  { id: "williamkatt", label: "William Katt", cat: "person", size: 10 },
+  { id: "robertculp", label: "Robert Culp", cat: "person", size: 8 },
+  { id: "alanAlda", label: "Alan Alda", cat: "person", size: 9 },
+  { id: "paulbettany", label: "Paul Bettany", cat: "person", size: 8 },
+  { id: "maitlis", label: "Emily Maitlis", cat: "person", size: 9 },
+  { id: "altman", label: "Robert Altman", cat: "person", size: 8 },
+  { id: "epstein", label: "Epstein Files", cat: "topic", size: 13 },
+  { id: "basementjaxx", label: "Basement Jaxx\n\"Yo-Yo\"", cat: "music", size: 11 },
+  { id: "underworld", label: "Underworld\n\"Born Slippy\"", cat: "music", size: 11 },
+  { id: "chemicalbros", label: "Chemical\nBrothers", cat: "music", size: 9 },
+  { id: "suicidepainless", label: "\"Suicide\nIs Painless\"", cat: "music", size: 10 },
+  { id: "believeitnot", label: "\"Believe It\nor Not\"", cat: "music", size: 8 },
+  { id: "drpepper", label: "\"I'm a Pepper\"\nDr. Pepper ads", cat: "music", size: 8 },
+  { id: "makinitsong", label: "\"Makin' It\"\n(charted #5)", cat: "music", size: 9 },
+  { id: "sanfrancisco", label: "San Francisco", cat: "place", size: 14 },
+  { id: "powellst", label: "Powell Street\nMUNI Station", cat: "place", size: 10 },
+  { id: "newzealand", label: "New Zealand", cat: "place", size: 12 },
+  { id: "telefilm", label: "Telefilm Canada\n(govt funding)", cat: "place", size: 10 },
+  { id: "bbc", label: "BBC", cat: "place", size: 11 },
+  { id: "abc", label: "ABC\n(network)", cat: "place", size: 11 },
+  { id: "pizzaexpress", label: "Pizza Express\nin Woking", cat: "place", size: 9 },
+  { id: "fakingit", label: "Faking It /\nMaking It", cat: "topic", size: 14 },
+  { id: "sanrio", label: "Sanrio /\nBadtz-Maru", cat: "topic", size: 13 },
+  { id: "pokemon", label: "Pokémon / Mario\n(confusion bit)", cat: "topic", size: 12 },
+  { id: "corgimix", label: "Corgi Mixes\n(wearing costumes)", cat: "topic", size: 11 },
+  { id: "applephotos", label: "Apple Photos\nSearch", cat: "tech", size: 10 },
+  { id: "disneychar", label: "Disney Big Head\nCharacters", cat: "topic", size: 11 },
+  { id: "turtletalk", label: "Turtle Talk\nwith Crush", cat: "topic", size: 9 },
+  { id: "vhs", label: "VHS Tape\nIntermissions", cat: "topic", size: 8 },
+  { id: "fentanyl", label: "SF Homelessness /\nFentanyl", cat: "topic", size: 9 },
+  { id: "evolution", label: "Island Evolution /\nDinosaurs", cat: "animal", size: 10 },
+  { id: "offmenu", label: "Off Menu\nPodcast", cat: "podcast", size: 9 },
+  { id: "perlcamel", label: "Perl / Larry Wall\n/ Camel Book", cat: "tech", size: 7 },
+  { id: "civetcoffee", label: "Civet Coffee\n(cats that shit)", cat: "animal", size: 7 },
+  { id: "govtfunding", label: "Government-\nFunded Media", cat: "topic", size: 10 },
+  { id: "kea", label: "Kea\n(smart NZ parrot)", cat: "animal", size: 14 },
+  { id: "closemagic", label: "Close-Up\nMagicians", cat: "topic", size: 9 },
+  { id: "magiccastle", label: "The Magic\nCastle", cat: "place", size: 7 },
+  { id: "pippin", label: "Pippin\n(musical)", cat: "theater", size: 10 },
+  { id: "cornersky", label: "Corner of the Sky\n(Quinn's podcast)", cat: "podcast", size: 10 },
+  { id: "sondheim", label: "Sondheim\n(fake musical riff)", cat: "theater", size: 8 },
+  { id: "rent", label: "Rent\n(musical)", cat: "theater", size: 7 },
+];
+const links = [
+  { source: "nirvanna", target: "mattjohnson", label: "directed by" },
+  { source: "mattjohnson", target: "blackberry", label: "also directed" },
+  { source: "blackberry", target: "telefilm", label: "funded by" },
+  { source: "nirvanna", target: "telefilm", label: "funded by" },
+  { source: "telefilm", target: "govtfunding" },
+  { source: "bbc", target: "govtfunding" },
+  { source: "scoop", target: "rufussewell", label: "stars" },
+  { source: "scoop", target: "gillian", label: "stars" },
+  { source: "scoop", target: "billiepiper", label: "stars" },
+  { source: "scoop", target: "princeandrew", label: "about" },
+  { source: "princeandrew", target: "epstein", label: "connected to" },
+  { source: "princeandrew", target: "pizzaexpress", label: "infamous alibi" },
+  { source: "rufussewell", target: "knightstale", label: "was in" },
+  { source: "rufussewell", target: "diplomat", label: "was in" },
+  { source: "knightstale", target: "heathledger", label: "starred" },
+  { source: "heathledger", target: "jimcarrey", label: "Merlin confuses" },
+  { source: "jimcarrey", target: "manmoon", label: "starred in" },
+  { source: "gillian", target: "offmenu", label: "great episode" },
+  { source: "gillian", target: "maitlis", label: "plays" },
+  { source: "fakingit", target: "makinit", label: "sounds like" },
+  { source: "fakingit", target: "mash_film", label: "Radar faking culture" },
+  { source: "makinit", target: "naughton", label: "stars" },
+  { source: "naughton", target: "drpepper", label: "\"I'm a Pepper\"" },
+  { source: "naughton", target: "awil", label: "starred in" },
+  { source: "makinit", target: "snf", label: "inspired by" },
+  { source: "makinit", target: "abc", label: "aired on" },
+  { source: "makinit", target: "makinitsong", label: "theme song" },
+  { source: "holmesyoyo", target: "johnschuck", label: "stars" },
+  { source: "johnschuck", target: "mash_film", label: "played Painless" },
+  { source: "mash_film", target: "altman", label: "directed by" },
+  { source: "mash_film", target: "suicidepainless", label: "theme song" },
+  { source: "mash_film", target: "alanAlda", label: "Hawkeye" },
+  { source: "mash_film", target: "mash_tv", label: "adapted into" },
+  { source: "alanAlda", target: "fakingit", label: "teaches bluffing" },
+  { source: "holmesyoyo", target: "abc", label: "aired on" },
+  { source: "holmesyoyo", target: "basementjaxx", label: "Yoyo → \"Yo-Yo\"" },
+  { source: "gah", target: "williamkatt", label: "stars" },
+  { source: "gah", target: "robertculp", label: "stars" },
+  { source: "gah", target: "abc", label: "aired on" },
+  { source: "gah", target: "believeitnot", label: "theme song" },
+  { source: "williamkatt", target: "pippin", label: "starred in" },
+  { source: "pippin", target: "cornersky", label: "big song → podcast name" },
+  { source: "basementjaxx", target: "chemicalbros", label: "same era" },
+  { source: "chemicalbros", target: "underworld", label: "90s electronic" },
+  { source: "underworld", target: "trainspotting", label: "in soundtrack" },
+  { source: "tarantino", target: "killbill", label: "directed" },
+  { source: "tarantino", target: "hateful8", label: "directed" },
+  { source: "killbill", target: "vhs", label: "intermission" },
+  { source: "soundofmusic", target: "vhs", label: "tape switch point" },
+  { source: "sanfrancisco", target: "powellst" },
+  { source: "sanfrancisco", target: "sanrio", label: "Sanrio store" },
+  { source: "powellst", target: "fentanyl", label: "\"abrupt on a Sunday\"" },
+  { source: "fentanyl", target: "sondheim", label: "fake musical riff" },
+  { source: "kea", target: "newzealand", label: "native to" },
+  { source: "kea", target: "closemagic", label: "like team of magicians" },
+  { source: "closemagic", target: "magiccastle" },
+  { source: "kea", target: "evolution", label: "island species" },
+  { source: "mastercommander", target: "evolution", label: "discovering species" },
+  { source: "mastercommander", target: "paulbettany", label: "stars" },
+  { source: "evolution", target: "jurassicpark", label: "dinosaurs" },
+  { source: "evolution", target: "newzealand", label: "isolated ecosystem" },
+  { source: "defunctland", target: "disneychar", label: "documentary about" },
+  { source: "disneychar", target: "turtletalk", label: "interactive tech" },
+  { source: "applephotos", target: "rent", label: "Alex searched \"rent\"" },
+  { source: "applephotos", target: "corgimix", label: "teaching dog breeds" },
+  { source: "pokemon", target: "sanrio", label: "Merlin confuses" },
+  { source: "epstein", target: "pokemon", label: "\"just for the PokéStop\"" },
+  { source: "dawsonscreek", target: "lword", label: "spinoff connection" },
+  { source: "soundofmusic", target: "fakingit", label: "Von Trapps outro" },
+  { source: "govtfunding", target: "nirvanna" },
+  { source: "govtfunding", target: "blackberry" },
+  { source: "makinit", target: "watershipdown", label: "\"very sad movie\"" },
+];
+// Build legend
+const legendEl = document.getElementById("legend");
+Object.entries(CATEGORIES).forEach(([key, val]) => {
+  const item = document.createElement("div");
+  item.className = "legend-item";
+  item.innerHTML = `<div class="legend-dot" style="background:${val.color}"></div><span class="legend-label">${val.label}</span>`;
+  legendEl.appendChild(item);
+});
+document.getElementById("stats").textContent = `${nodes.length} topics · ${links.length} connections`;
+// Setup SVG
+const W = 1200, H = 900;
+const svg = d3.select("#graph").attr("viewBox", `0 0 ${W} ${H}`);
+const defs = svg.append("defs");
+const filter = defs.append("filter").attr("id", "glow");
+filter.append("feGaussianBlur").attr("stdDeviation", 3).attr("result", "coloredBlur");
+const merge = filter.append("feMerge");
+merge.append("feMergeNode").attr("in", "coloredBlur");
+merge.append("feMergeNode").attr("in", "SourceGraphic");
+const g = svg.append("g");
+const zoomBehavior = d3.zoom()
+  .scaleExtent([0.3, 3])
+  .on("zoom", (e) => g.attr("transform", e.transform));
+svg.call(zoomBehavior);
+svg.call(zoomBehavior.transform, d3.zoomIdentity.translate(W / 2, H / 2).scale(0.75).translate(-W / 2, -H / 2));
+// Simulation
+const simulation = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(links).id(d => d.id).distance(120).strength(0.4))
+  .force("charge", d3.forceManyBody().strength(-400))
+  .force("center", d3.forceCenter(W / 2, H / 2))
+  .force("collision", d3.forceCollide().radius(d => d.size + 20))
+  .force("x", d3.forceX(W / 2).strength(0.05))
+  .force("y", d3.forceY(H / 2).strength(0.05));
+// Links
+const linkG = g.append("g");
+const linkLines = linkG.selectAll("line")
+  .data(links).join("line")
+  .attr("stroke", "#555").attr("stroke-opacity", 0.25).attr("stroke-width", 1.2);
+const linkLabels = linkG.selectAll("text")
+  .data(links.filter(l => l.label)).join("text")
+  .attr("class", "link-label")
+  .text(d => d.label.replace(/\n/g, " "))
+  .style("opacity", 0);
+// Nodes
+const nodeG = g.append("g");
+const nodeElements = nodeG.selectAll("g")
+  .data(nodes).join("g")
+  .style("cursor", "pointer");
+nodeElements.append("circle")
+  .attr("r", d => d.size)
+  .attr("fill", d => CATEGORIES[d.cat].color)
+  .attr("fill-opacity", 0.85)
+  .attr("stroke", d => CATEGORIES[d.cat].color)
+  .attr("stroke-width", 2)
+  .attr("stroke-opacity", 0.4);
+nodeElements.each(function(d) {
+  const el = d3.select(this);
+  const lines = d.label.split("\n");
+  const fs = d.size < 10 ? 7 : d.size < 14 ? 8 : 9;
+  lines.forEach((line, i) => {
+    el.append("text")
+      .text(line)
+      .attr("class", "node-label")
+      .attr("text-anchor", "middle")
+      .attr("dy", (i - (lines.length - 1) / 2) * (fs + 2) + 1)
+      .attr("font-size", fs + "px")
+      .attr("fill", "#fff")
+      .attr("stroke", CATEGORIES[d.cat].color)
+      .attr("stroke-width", 3);
+  });
+});
+// Drag
+nodeElements.call(d3.drag()
+  .on("start", (e, d) => {
+    if (!e.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x; d.fy = d.y;
+  })
+  .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; })
+  .on("end", (e, d) => {
+    if (!e.active) simulation.alphaTarget(0);
+    d.fx = null; d.fy = null;
+  })
+);
+// Helpers
+function getConnected(id) {
+  const s = new Set([id]);
+  links.forEach(l => {
+    const sId = typeof l.source === "object" ? l.source.id : l.source;
+    const tId = typeof l.target === "object" ? l.target.id : l.target;
+    if (sId === id) s.add(tId);
+    if (tId === id) s.add(sId);
+  });
+  return s;
+}
+const hoverInfo = document.getElementById("hover-info");
+const hoverName = hoverInfo.querySelector(".name");
+const hoverMeta = hoverInfo.querySelector(".meta");
+// Hover
+nodeElements.on("mouseenter", function(e, d) {
+  const conn = getConnected(d.id);
+  const count = conn.size - 1;
+  hoverName.textContent = d.label.replace(/\n/g, " ");
+  hoverName.style.color = CATEGORIES[d.cat].color;
+  hoverMeta.textContent = `${CATEGORIES[d.cat].label} · ${count} connection${count !== 1 ? "s" : ""}`;
+  hoverInfo.style.display = "block";
+  hoverInfo.style.borderColor = CATEGORIES[d.cat].color;
+  nodeElements.select("circle")
+    .attr("fill-opacity", n => conn.has(n.id) ? 1 : 0.08)
+    .attr("stroke-opacity", n => conn.has(n.id) ? 1 : 0.03)
+    .attr("filter", n => n.id === d.id ? "url(#glow)" : null);
+  nodeElements.selectAll("text")
+    .style("opacity", function() {
+      return conn.has(d3.select(this.parentNode).datum().id) ? 1 : 0.08;
+    });
+  linkLines
+    .attr("stroke-opacity", l => {
+      const s = typeof l.source === "object" ? l.source.id : l.source;
+      const t = typeof l.target === "object" ? l.target.id : l.target;
+      return (s === d.id || t === d.id) ? 0.7 : 0.03;
+    })
+    .attr("stroke-width", l => {
+      const s = typeof l.source === "object" ? l.source.id : l.source;
+      const t = typeof l.target === "object" ? l.target.id : l.target;
+      return (s === d.id || t === d.id) ? 2.5 : 1;
+    })
+    .attr("stroke", l => {
+      const s = typeof l.source === "object" ? l.source.id : l.source;
+      const t = typeof l.target === "object" ? l.target.id : l.target;
+      return (s === d.id || t === d.id) ? CATEGORIES[d.cat].color : "#555";
+    });
+  linkLabels.style("opacity", l => {
+    const s = typeof l.source === "object" ? l.source.id : l.source;
+    const t = typeof l.target === "object" ? l.target.id : l.target;
+    return (s === d.id || t === d.id) ? 1 : 0;
+  });
+});
+nodeElements.on("mouseleave", function() {
+  hoverInfo.style.display = "none";
+  nodeElements.select("circle")
+    .attr("fill-opacity", 0.85).attr("stroke-opacity", 0.4).attr("filter", null);
+  nodeElements.selectAll("text").style("opacity", 1);
+  linkLines.attr("stroke-opacity", 0.25).attr("stroke-width", 1.2).attr("stroke", "#555");
+  linkLabels.style("opacity", 0);
+});
+// Tick
+simulation.on("tick", () => {
+  linkLines
+    .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+    .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+  linkLabels
+    .attr("x", d => (d.source.x + d.target.x) / 2)
+    .attr("y", d => (d.source.y + d.target.y) / 2);
+  nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
+});
+</script>
+</body>
+</html>
