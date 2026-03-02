@@ -58,6 +58,39 @@
   .node-label {
     font-weight: 600; pointer-events: none; paint-order: stroke; stroke-linejoin: round;
   }
+  @media (max-width: 600px) {
+    #title {
+      top: 10px; left: 12px; max-width: 65%;
+    }
+    #title h1 {
+      font-size: 16px;
+    }
+    #title .eyebrow {
+      font-size: 9px;
+    }
+    #title .hint {
+      display: none;
+    }
+    #title a {
+      margin-top: 4px !important; font-size: 10px !important;
+    }
+    #legend {
+      top: auto; bottom: 56px; right: 12px; left: auto;
+      max-width: 220px; gap: 4px 10px;
+    }
+    .legend-label {
+      font-size: 8px;
+    }
+    .legend-dot {
+      width: 6px; height: 6px;
+    }
+    #hover-info {
+      bottom: 12px; left: 12px; max-width: 200px; padding: 8px 10px;
+    }
+    #stats {
+      bottom: 12px; right: 12px; font-size: 8px;
+    }
+  }
 </style>
 </head>
 <body>
