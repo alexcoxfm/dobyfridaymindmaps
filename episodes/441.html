@@ -47,6 +47,7 @@
   }
   #hover-info .name { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
   #hover-info .meta { font-size: 10px; color: #888; }
+  #hover-info .link-hint { font-size: 9px; color: #58a6ff; margin-top: 4px; }
   #stats {
     position: absolute; bottom: 20px; right: 20px; z-index: 10;
     color: #444; font-size: 9px; text-align: right;
@@ -57,19 +58,53 @@
   .node-label {
     font-weight: 600; pointer-events: none; paint-order: stroke; stroke-linejoin: round;
   }
+  @media (max-width: 600px) {
+    #title {
+      top: 10px; left: 12px; max-width: 65%;
+    }
+    #title h1 {
+      font-size: 16px;
+    }
+    #title .eyebrow {
+      font-size: 9px;
+    }
+    #title .hint {
+      display: none;
+    }
+    #title a {
+      margin-top: 4px !important; font-size: 10px !important;
+    }
+    #legend {
+      top: auto; bottom: 56px; right: 12px; left: auto;
+      max-width: 220px; gap: 4px 10px;
+    }
+    .legend-label {
+      font-size: 8px;
+    }
+    .legend-dot {
+      width: 6px; height: 6px;
+    }
+    #hover-info {
+      bottom: 12px; left: 12px; max-width: 200px; padding: 8px 10px;
+    }
+    #stats {
+      bottom: 12px; right: 12px; font-size: 8px;
+    }
+  }
 </style>
 </head>
 <body>
 <div id="title">
   <div class="eyebrow">Do By Friday #441</div>
   <h1>Topic Connection Map</h1>
-  <div class="hint">Hover nodes to see connections · Drag to rearrange · Scroll to zoom</div>
+  <div class="hint">Hover nodes to see connections · Click linked nodes to open source · Drag to rearrange · Scroll to zoom</div>
   <a href="../index.html" style="display:inline-block;margin-top:10px;font-size:11px;color:#58a6ff;text-decoration:none;letter-spacing:0.02em;">&larr; All Episodes</a>
 </div>
 <div id="legend"></div>
 <div id="hover-info">
   <div class="name"></div>
   <div class="meta"></div>
+  <div class="link-hint"></div>
 </div>
 <div id="stats"></div>
 <svg id="graph"></svg>
@@ -86,63 +121,63 @@ const CATEGORIES = {
   podcast: { color: "#fb8500", label: "Podcast / Media" },
 };
 const nodes = [
-  { id: "nirvanna", label: "Nirvanna the Band\nthe Show the Movie", cat: "film", size: 18 },
-  { id: "blackberry", label: "BlackBerry", cat: "film", size: 14 },
-  { id: "scoop", label: "Scoop", cat: "film", size: 16 },
-  { id: "knightstale", label: "A Knight's Tale", cat: "film", size: 10 },
-  { id: "killbill", label: "Kill Bill\n(Whole Bloody Affair)", cat: "film", size: 12 },
-  { id: "hateful8", label: "The Hateful Eight\n(Netflix cut)", cat: "film", size: 9 },
-  { id: "mash_film", label: "MASH (1970)", cat: "film", size: 14 },
-  { id: "holmesyoyo", label: "Holmes & Yoyo", cat: "film", size: 15 },
-  { id: "makinit", label: "Makin' It\n(1979)", cat: "film", size: 14 },
-  { id: "gah", label: "Greatest\nAmerican Hero", cat: "film", size: 13 },
-  { id: "snf", label: "Saturday\nNight Fever", cat: "film", size: 10 },
-  { id: "awil", label: "American Werewolf\nin London", cat: "film", size: 10 },
-  { id: "soundofmusic", label: "The Sound\nof Music", cat: "film", size: 13 },
-  { id: "mastercommander", label: "Master and\nCommander", cat: "film", size: 11 },
-  { id: "jurassicpark", label: "Jurassic Park", cat: "film", size: 10 },
-  { id: "diplomat", label: "The Diplomat", cat: "film", size: 8 },
-  { id: "trainspotting", label: "Trainspotting", cat: "film", size: 9 },
-  { id: "dawsonscreek", label: "Dawson's Creek", cat: "film", size: 8 },
-  { id: "lword", label: "The L Word", cat: "film", size: 8 },
-  { id: "manmoon", label: "Man on the Moon", cat: "film", size: 8 },
-  { id: "mash_tv", label: "M*A*S*H\n(TV series)", cat: "film", size: 10 },
-  { id: "watershipdown", label: "Watership Down", cat: "film", size: 7 },
-  { id: "defunctland", label: "Defunctland", cat: "podcast", size: 12 },
-  { id: "mattjohnson", label: "Matt Johnson", cat: "person", size: 12 },
-  { id: "rufussewell", label: "Rufus Sewell", cat: "person", size: 14 },
-  { id: "gillian", label: "Gillian Anderson", cat: "person", size: 11 },
-  { id: "billiepiper", label: "Billie Piper", cat: "person", size: 9 },
-  { id: "princeandrew", label: "Prince Andrew", cat: "person", size: 13 },
-  { id: "heathledger", label: "Heath Ledger", cat: "person", size: 10 },
-  { id: "jimcarrey", label: "Jim Carrey", cat: "person", size: 8 },
-  { id: "tarantino", label: "Tarantino", cat: "person", size: 11 },
-  { id: "johnschuck", label: "John Schuck", cat: "person", size: 12 },
-  { id: "naughton", label: "David Naughton", cat: "person", size: 11 },
-  { id: "williamkatt", label: "William Katt", cat: "person", size: 10 },
-  { id: "robertculp", label: "Robert Culp", cat: "person", size: 8 },
-  { id: "alanAlda", label: "Alan Alda", cat: "person", size: 9 },
-  { id: "paulbettany", label: "Paul Bettany", cat: "person", size: 8 },
-  { id: "maitlis", label: "Emily Maitlis", cat: "person", size: 9 },
-  { id: "altman", label: "Robert Altman", cat: "person", size: 8 },
-  { id: "epstein", label: "Epstein Files", cat: "topic", size: 13 },
-  { id: "basementjaxx", label: "Basement Jaxx\n\"Yo-Yo\"", cat: "music", size: 11 },
-  { id: "underworld", label: "Underworld\n\"Born Slippy\"", cat: "music", size: 11 },
-  { id: "chemicalbros", label: "Chemical\nBrothers", cat: "music", size: 9 },
-  { id: "suicidepainless", label: "\"Suicide\nIs Painless\"", cat: "music", size: 10 },
+  { id: "nirvanna", label: "Nirvanna the Band\nthe Show the Movie", cat: "film", size: 18, url: "https://en.wikipedia.org/wiki/Nirvanna_the_Band_the_Show" },
+  { id: "blackberry", label: "BlackBerry", cat: "film", size: 14, url: "https://en.wikipedia.org/wiki/BlackBerry_(film)" },
+  { id: "scoop", label: "Scoop", cat: "film", size: 16, url: "https://en.wikipedia.org/wiki/Scoop_(2024_film)" },
+  { id: "knightstale", label: "A Knight's Tale", cat: "film", size: 10, url: "https://en.wikipedia.org/wiki/A_Knight%27s_Tale_(film)" },
+  { id: "killbill", label: "Kill Bill\n(Whole Bloody Affair)", cat: "film", size: 12, url: "https://en.wikipedia.org/wiki/Kill_Bill:_Volume_1" },
+  { id: "hateful8", label: "The Hateful Eight\n(Netflix cut)", cat: "film", size: 9, url: "https://en.wikipedia.org/wiki/The_Hateful_Eight" },
+  { id: "mash_film", label: "MASH (1970)", cat: "film", size: 14, url: "https://en.wikipedia.org/wiki/MASH_(film)" },
+  { id: "holmesyoyo", label: "Holmes & Yoyo", cat: "film", size: 15, url: "https://en.wikipedia.org/wiki/Holmes_%26_Yoyo" },
+  { id: "makinit", label: "Makin' It\n(1979)", cat: "film", size: 14, url: "https://en.wikipedia.org/wiki/Makin%27_It" },
+  { id: "gah", label: "Greatest\nAmerican Hero", cat: "film", size: 13, url: "https://en.wikipedia.org/wiki/The_Greatest_American_Hero" },
+  { id: "snf", label: "Saturday\nNight Fever", cat: "film", size: 10, url: "https://en.wikipedia.org/wiki/Saturday_Night_Fever" },
+  { id: "awil", label: "American Werewolf\nin London", cat: "film", size: 10, url: "https://en.wikipedia.org/wiki/An_American_Werewolf_in_London" },
+  { id: "soundofmusic", label: "The Sound\nof Music", cat: "film", size: 13, url: "https://en.wikipedia.org/wiki/The_Sound_of_Music_(film)" },
+  { id: "mastercommander", label: "Master and\nCommander", cat: "film", size: 11, url: "https://en.wikipedia.org/wiki/Master_and_Commander:_The_Far_Side_of_the_World" },
+  { id: "jurassicpark", label: "Jurassic Park", cat: "film", size: 10, url: "https://en.wikipedia.org/wiki/Jurassic_Park_(film)" },
+  { id: "diplomat", label: "The Diplomat", cat: "film", size: 8, url: "https://en.wikipedia.org/wiki/The_Diplomat_(TV_series)" },
+  { id: "trainspotting", label: "Trainspotting", cat: "film", size: 9, url: "https://en.wikipedia.org/wiki/Trainspotting_(film)" },
+  { id: "dawsonscreek", label: "Dawson's Creek", cat: "film", size: 8, url: "https://en.wikipedia.org/wiki/Dawson%27s_Creek" },
+  { id: "lword", label: "The L Word", cat: "film", size: 8, url: "https://en.wikipedia.org/wiki/The_L_Word" },
+  { id: "manmoon", label: "Man on the Moon", cat: "film", size: 8, url: "https://en.wikipedia.org/wiki/Man_on_the_Moon_(film)" },
+  { id: "mash_tv", label: "M*A*S*H\n(TV series)", cat: "film", size: 10, url: "https://en.wikipedia.org/wiki/M*A*S*H_(TV_series)" },
+  { id: "watershipdown", label: "Watership Down", cat: "film", size: 7, url: "https://en.wikipedia.org/wiki/Watership_Down_(film)" },
+  { id: "defunctland", label: "Defunctland", cat: "podcast", size: 12, url: "https://en.wikipedia.org/wiki/Defunctland" },
+  { id: "mattjohnson", label: "Matt Johnson", cat: "person", size: 12, url: "https://en.wikipedia.org/wiki/Matt_Johnson_(filmmaker)" },
+  { id: "rufussewell", label: "Rufus Sewell", cat: "person", size: 14, url: "https://en.wikipedia.org/wiki/Rufus_Sewell" },
+  { id: "gillian", label: "Gillian Anderson", cat: "person", size: 11, url: "https://en.wikipedia.org/wiki/Gillian_Anderson" },
+  { id: "billiepiper", label: "Billie Piper", cat: "person", size: 9, url: "https://en.wikipedia.org/wiki/Billie_Piper" },
+  { id: "princeandrew", label: "Prince Andrew", cat: "person", size: 13, url: "https://en.wikipedia.org/wiki/Prince_Andrew,_Duke_of_York" },
+  { id: "heathledger", label: "Heath Ledger", cat: "person", size: 10, url: "https://en.wikipedia.org/wiki/Heath_Ledger" },
+  { id: "jimcarrey", label: "Jim Carrey", cat: "person", size: 8, url: "https://en.wikipedia.org/wiki/Jim_Carrey" },
+  { id: "tarantino", label: "Tarantino", cat: "person", size: 11, url: "https://en.wikipedia.org/wiki/Quentin_Tarantino" },
+  { id: "johnschuck", label: "John Schuck", cat: "person", size: 12, url: "https://en.wikipedia.org/wiki/John_Schuck" },
+  { id: "naughton", label: "David Naughton", cat: "person", size: 11, url: "https://en.wikipedia.org/wiki/David_Naughton" },
+  { id: "williamkatt", label: "William Katt", cat: "person", size: 10, url: "https://en.wikipedia.org/wiki/William_Katt" },
+  { id: "robertculp", label: "Robert Culp", cat: "person", size: 8, url: "https://en.wikipedia.org/wiki/Robert_Culp" },
+  { id: "alanAlda", label: "Alan Alda", cat: "person", size: 9, url: "https://en.wikipedia.org/wiki/Alan_Alda" },
+  { id: "paulbettany", label: "Paul Bettany", cat: "person", size: 8, url: "https://en.wikipedia.org/wiki/Paul_Bettany" },
+  { id: "maitlis", label: "Emily Maitlis", cat: "person", size: 9, url: "https://en.wikipedia.org/wiki/Emily_Maitlis" },
+  { id: "altman", label: "Robert Altman", cat: "person", size: 8, url: "https://en.wikipedia.org/wiki/Robert_Altman" },
+  { id: "epstein", label: "Epstein Files", cat: "topic", size: 13, url: "https://en.wikipedia.org/wiki/Jeffrey_Epstein" },
+  { id: "basementjaxx", label: "Basement Jaxx\n\"Yo-Yo\"", cat: "music", size: 11, url: "https://en.wikipedia.org/wiki/Basement_Jaxx" },
+  { id: "underworld", label: "Underworld\n\"Born Slippy\"", cat: "music", size: 11, url: "https://en.wikipedia.org/wiki/Underworld_(band)" },
+  { id: "chemicalbros", label: "Chemical\nBrothers", cat: "music", size: 9, url: "https://en.wikipedia.org/wiki/The_Chemical_Brothers" },
+  { id: "suicidepainless", label: "\"Suicide\nIs Painless\"", cat: "music", size: 10, url: "https://en.wikipedia.org/wiki/Suicide_Is_Painless" },
   { id: "believeitnot", label: "\"Believe It\nor Not\"", cat: "music", size: 8 },
   { id: "drpepper", label: "\"I'm a Pepper\"\nDr. Pepper ads", cat: "music", size: 8 },
   { id: "makinitsong", label: "\"Makin' It\"\n(charted #5)", cat: "music", size: 9 },
-  { id: "sanfrancisco", label: "San Francisco", cat: "place", size: 14 },
+  { id: "sanfrancisco", label: "San Francisco", cat: "place", size: 14, url: "https://en.wikipedia.org/wiki/San_Francisco" },
   { id: "powellst", label: "Powell Street\nMUNI Station", cat: "place", size: 10 },
-  { id: "newzealand", label: "New Zealand", cat: "place", size: 12 },
-  { id: "telefilm", label: "Telefilm Canada\n(govt funding)", cat: "place", size: 10 },
-  { id: "bbc", label: "BBC", cat: "place", size: 11 },
-  { id: "abc", label: "ABC\n(network)", cat: "place", size: 11 },
+  { id: "newzealand", label: "New Zealand", cat: "place", size: 12, url: "https://en.wikipedia.org/wiki/New_Zealand" },
+  { id: "telefilm", label: "Telefilm Canada\n(govt funding)", cat: "place", size: 10, url: "https://en.wikipedia.org/wiki/Telefilm_Canada" },
+  { id: "bbc", label: "BBC", cat: "place", size: 11, url: "https://en.wikipedia.org/wiki/BBC" },
+  { id: "abc", label: "ABC\n(network)", cat: "place", size: 11, url: "https://en.wikipedia.org/wiki/American_Broadcasting_Company" },
   { id: "pizzaexpress", label: "Pizza Express\nin Woking", cat: "place", size: 9 },
   { id: "fakingit", label: "Faking It /\nMaking It", cat: "topic", size: 14 },
-  { id: "sanrio", label: "Sanrio /\nBadtz-Maru", cat: "topic", size: 13 },
-  { id: "pokemon", label: "Pokémon / Mario\n(confusion bit)", cat: "topic", size: 12 },
+  { id: "sanrio", label: "Sanrio /\nBadtz-Maru", cat: "topic", size: 13, url: "https://en.wikipedia.org/wiki/Sanrio" },
+  { id: "pokemon", label: "Pok\u00e9mon / Mario\n(confusion bit)", cat: "topic", size: 12, url: "https://en.wikipedia.org/wiki/Pok%C3%A9mon" },
   { id: "corgimix", label: "Corgi Mixes\n(wearing costumes)", cat: "topic", size: 11 },
   { id: "applephotos", label: "Apple Photos\nSearch", cat: "tech", size: 10 },
   { id: "disneychar", label: "Disney Big Head\nCharacters", cat: "topic", size: 11 },
@@ -151,16 +186,16 @@ const nodes = [
   { id: "fentanyl", label: "SF Homelessness /\nFentanyl", cat: "topic", size: 9 },
   { id: "evolution", label: "Island Evolution /\nDinosaurs", cat: "animal", size: 10 },
   { id: "offmenu", label: "Off Menu\nPodcast", cat: "podcast", size: 9 },
-  { id: "perlcamel", label: "Perl / Larry Wall\n/ Camel Book", cat: "tech", size: 7 },
-  { id: "civetcoffee", label: "Civet Coffee\n(cats that shit)", cat: "animal", size: 7 },
+  { id: "perlcamel", label: "Perl / Larry Wall\n/ Camel Book", cat: "tech", size: 7, url: "https://en.wikipedia.org/wiki/Programming_Perl" },
+  { id: "civetcoffee", label: "Civet Coffee\n(cats that shit)", cat: "animal", size: 7, url: "https://en.wikipedia.org/wiki/Kopi_luwak" },
   { id: "govtfunding", label: "Government-\nFunded Media", cat: "topic", size: 10 },
-  { id: "kea", label: "Kea\n(smart NZ parrot)", cat: "animal", size: 14 },
+  { id: "kea", label: "Kea\n(smart NZ parrot)", cat: "animal", size: 14, url: "https://en.wikipedia.org/wiki/Kea" },
   { id: "closemagic", label: "Close-Up\nMagicians", cat: "topic", size: 9 },
-  { id: "magiccastle", label: "The Magic\nCastle", cat: "place", size: 7 },
-  { id: "pippin", label: "Pippin\n(musical)", cat: "theater", size: 10 },
+  { id: "magiccastle", label: "The Magic\nCastle", cat: "place", size: 7, url: "https://en.wikipedia.org/wiki/The_Magic_Castle" },
+  { id: "pippin", label: "Pippin\n(musical)", cat: "theater", size: 10, url: "https://en.wikipedia.org/wiki/Pippin_(musical)" },
   { id: "cornersky", label: "Corner of the Sky\n(Quinn's podcast)", cat: "podcast", size: 10 },
-  { id: "sondheim", label: "Sondheim\n(fake musical riff)", cat: "theater", size: 8 },
-  { id: "rent", label: "Rent\n(musical)", cat: "theater", size: 7 },
+  { id: "sondheim", label: "Sondheim\n(fake musical riff)", cat: "theater", size: 8, url: "https://en.wikipedia.org/wiki/Stephen_Sondheim" },
+  { id: "rent", label: "Rent\n(musical)", cat: "theater", size: 7, url: "https://en.wikipedia.org/wiki/Rent_(musical)" },
 ];
 const links = [
   { source: "nirvanna", target: "mattjohnson", label: "directed by" },
@@ -198,13 +233,13 @@ const links = [
   { source: "mash_film", target: "mash_tv", label: "adapted into" },
   { source: "alanAlda", target: "fakingit", label: "teaches bluffing" },
   { source: "holmesyoyo", target: "abc", label: "aired on" },
-  { source: "holmesyoyo", target: "basementjaxx", label: "Yoyo → \"Yo-Yo\"" },
+  { source: "holmesyoyo", target: "basementjaxx", label: "Yoyo \u2192 \"Yo-Yo\"" },
   { source: "gah", target: "williamkatt", label: "stars" },
   { source: "gah", target: "robertculp", label: "stars" },
   { source: "gah", target: "abc", label: "aired on" },
   { source: "gah", target: "believeitnot", label: "theme song" },
   { source: "williamkatt", target: "pippin", label: "starred in" },
-  { source: "pippin", target: "cornersky", label: "big song → podcast name" },
+  { source: "pippin", target: "cornersky", label: "big song \u2192 podcast name" },
   { source: "basementjaxx", target: "chemicalbros", label: "same era" },
   { source: "chemicalbros", target: "underworld", label: "90s electronic" },
   { source: "underworld", target: "trainspotting", label: "in soundtrack" },
@@ -229,7 +264,7 @@ const links = [
   { source: "applephotos", target: "rent", label: "Alex searched \"rent\"" },
   { source: "applephotos", target: "corgimix", label: "teaching dog breeds" },
   { source: "pokemon", target: "sanrio", label: "Merlin confuses" },
-  { source: "epstein", target: "pokemon", label: "\"just for the PokéStop\"" },
+  { source: "epstein", target: "pokemon", label: "\"just for the Pok\u00e9Stop\"" },
   { source: "dawsonscreek", target: "lword", label: "spinoff connection" },
   { source: "soundofmusic", target: "fakingit", label: "Von Trapps outro" },
   { source: "govtfunding", target: "nirvanna" },
@@ -244,7 +279,7 @@ Object.entries(CATEGORIES).forEach(([key, val]) => {
   item.innerHTML = `<div class="legend-dot" style="background:${val.color}"></div><span class="legend-label">${val.label}</span>`;
   legendEl.appendChild(item);
 });
-document.getElementById("stats").textContent = `${nodes.length} topics · ${links.length} connections`;
+document.getElementById("stats").textContent = `${nodes.length} topics \u00b7 ${links.length} connections`;
 // Setup SVG
 const W = 1200, H = 900;
 const svg = d3.select("#graph").attr("viewBox", `0 0 ${W} ${H}`);
@@ -282,7 +317,7 @@ const linkLabels = linkG.selectAll("text")
 const nodeG = g.append("g");
 const nodeElements = nodeG.selectAll("g")
   .data(nodes).join("g")
-  .style("cursor", "pointer");
+  .style("cursor", d => d.url ? "pointer" : "grab");
 nodeElements.append("circle")
   .attr("r", d => d.size)
   .attr("fill", d => CATEGORIES[d.cat].color)
@@ -290,6 +325,14 @@ nodeElements.append("circle")
   .attr("stroke", d => CATEGORIES[d.cat].color)
   .attr("stroke-width", 2)
   .attr("stroke-opacity", 0.4);
+// Dashed outer ring for nodes with URLs
+nodeElements.filter(d => d.url).append("circle")
+  .attr("r", d => d.size + 3)
+  .attr("fill", "none")
+  .attr("stroke", "#58a6ff")
+  .attr("stroke-width", 1)
+  .attr("stroke-dasharray", "2,2")
+  .attr("stroke-opacity", 0.5);
 nodeElements.each(function(d) {
   const el = d3.select(this);
   const lines = d.label.split("\n");
@@ -306,18 +349,30 @@ nodeElements.each(function(d) {
       .attr("stroke-width", 3);
   });
 });
-// Drag
+// Drag (with click guard)
+let dragMoved = false;
 nodeElements.call(d3.drag()
   .on("start", (e, d) => {
+    dragMoved = false;
     if (!e.active) simulation.alphaTarget(0.3).restart();
     d.fx = d.x; d.fy = d.y;
   })
-  .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; })
+  .on("drag", (e, d) => {
+    dragMoved = true;
+    d.fx = e.x; d.fy = e.y;
+  })
   .on("end", (e, d) => {
     if (!e.active) simulation.alphaTarget(0);
     d.fx = null; d.fy = null;
   })
 );
+// Click to open URL
+nodeElements.on("click", function(e, d) {
+  if (dragMoved) return;
+  if (d.url) {
+    window.open(d.url, "_blank", "noopener");
+  }
+});
 // Helpers
 function getConnected(id) {
   const s = new Set([id]);
@@ -332,13 +387,15 @@ function getConnected(id) {
 const hoverInfo = document.getElementById("hover-info");
 const hoverName = hoverInfo.querySelector(".name");
 const hoverMeta = hoverInfo.querySelector(".meta");
+const hoverLink = hoverInfo.querySelector(".link-hint");
 // Hover
 nodeElements.on("mouseenter", function(e, d) {
   const conn = getConnected(d.id);
   const count = conn.size - 1;
   hoverName.textContent = d.label.replace(/\n/g, " ");
   hoverName.style.color = CATEGORIES[d.cat].color;
-  hoverMeta.textContent = `${CATEGORIES[d.cat].label} · ${count} connection${count !== 1 ? "s" : ""}`;
+  hoverMeta.textContent = `${CATEGORIES[d.cat].label} \u00b7 ${count} connection${count !== 1 ? "s" : ""}`;
+  hoverLink.textContent = d.url ? "Click to open source \u2197" : "";
   hoverInfo.style.display = "block";
   hoverInfo.style.borderColor = CATEGORIES[d.cat].color;
   nodeElements.select("circle")
