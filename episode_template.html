@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Do By Friday #{{EPISODE_NUMBER}} — Topic Connection Map</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+  }
+  svg { display: block; width: 100%; height: 100%; }
+  #title {
+    position: absolute; top: 16px; left: 20px; z-index: 10; color: #fff;
+  }
+  #title .eyebrow {
+    font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: #888; margin-bottom: 4px;
+  }
+  #title h1 {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; margin: 0;
+  }
+  #title .hint {
+    font-size: 10px; color: #666; margin-top: 6px;
+  }
+  #legend {
+    position: absolute; top: 16px; right: 20px; z-index: 10;
+    display: flex; flex-wrap: wrap; gap: 6px 14px; max-width: 340; justify-content: flex-end;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 5px;
+  }
+  .legend-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .legend-label {
+    font-size: 9px; color: #aaa; letter-spacing: 0.05em; white-space: nowrap;
+  }
+  #hover-info {
+    position: absolute; bottom: 20px; left: 20px; z-index: 10;
+    background: rgba(10,10,15,0.92); border-radius: 6px; padding: 10px 14px;
+    max-width: 280; display: none; backdrop-filter: blur(4px);
+  }
+  #hover-info .name { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+  #hover-info .meta { font-size: 10px; color: #888; }
+  #hover-info .link-hint { font-size: 9px; color: #58a6ff; margin-top: 4px; }
+  #stats {
+    position: absolute; bottom: 20px; right: 20px; z-index: 10;
+    color: #444; font-size: 9px; text-align: right;
+  }
+  .link-label {
+    font-size: 7px; fill: #999; pointer-events: none; text-anchor: middle;
+  }
+  .node-label {
+    font-weight: 600; pointer-events: none; paint-order: stroke; stroke-linejoin: round;
+  }
+  @media (max-width: 600px) {
+    #title {
+      top: 10px; left: 12px; max-width: 65%;
+    }
+    #title h1 {
+      font-size: 16px;
+    }
+    #title .eyebrow {
+      font-size: 9px;
+    }
+    #title .hint {
+      display: none;
+    }
+    #title a {
+      margin-top: 4px !important; font-size: 10px !important;
+    }
+    #legend {
+      top: auto; bottom: 56px; right: 12px; left: auto;
+      max-width: 220px; gap: 4px 10px;
+    }
+    .legend-label {
+      font-size: 8px;
+    }
+    .legend-dot {
+      width: 6px; height: 6px;
+    }
+    #hover-info {
+      bottom: 12px; left: 12px; max-width: 200px; padding: 8px 10px;
+    }
+    #stats {
+      bottom: 12px; right: 12px; font-size: 8px;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="title">
+  <div class="eyebrow">Do By Friday #{{EPISODE_NUMBER}}</div>
+  <h1>Topic Connection Map</h1>
+  <div class="hint">Hover nodes to see connections · Click linked nodes to open source · Drag to rearrange · Scroll to zoom</div>
+  <a href="../index.html" style="display:inline-block;margin-top:10px;font-size:11px;color:#58a6ff;text-decoration:none;letter-spacing:0.02em;">&larr; All Episodes</a>
+</div>
+<div id="legend"></div>
+<div id="hover-info">
+  <div class="name"></div>
+  <div class="meta"></div>
+  <div class="link-hint"></div>
+</div>
+<div id="stats"></div>
+<svg id="graph"></svg>
+<script>
+const CATEGORIES = {
+  film:    { color: "#e63946", label: "Film / TV" },
+  music:   { color: "#f77f00", label: "Music" },
+  person:  { color: "#2a9d8f", label: "Person" },
+  place:   { color: "#264653", label: "Place" },
+  topic:   { color: "#7209b7", label: "Topic / Bit" },
+  animal:  { color: "#52b788", label: "Animal / Nature" },
+  tech:    { color: "#4361ee", label: "Tech / Internet" },
+  theater: { color: "#d62828", label: "Theater" },
+  podcast: { color: "#fb8500", label: "Podcast / Media" },
+};
+const nodes = {{NODES_JSON}};
+const links = {{LINKS_JSON}};
+// Build legend
+const legendEl = document.getElementById("legend");
+Object.entries(CATEGORIES).forEach(([key, val]) => {
+  const item = document.createElement("div");
+  item.className = "legend-item";
+  item.innerHTML = `<div class="legend-dot" style="background:${val.color}"></div><span class="legend-label">${val.label}</span>`;
+  legendEl.appendChild(item);
+});
+document.getElementById("stats").textContent = `${nodes.length} topics \u00b7 ${links.length} connections`;
+// Setup SVG
+const W = 1200, H = 900;
+const svg = d3.select("#graph").attr("viewBox", `0 0 ${W} ${H}`);
+const defs = svg.append("defs");
+const filter = defs.append("filter").attr("id", "glow");
+filter.append("feGaussianBlur").attr("stdDeviation", 3).attr("result", "coloredBlur");
+const merge = filter.append("feMerge");
+merge.append("feMergeNode").attr("in", "coloredBlur");
+merge.append("feMergeNode").attr("in", "SourceGraphic");
+const g = svg.append("g");
+const zoomBehavior = d3.zoom()
+  .scaleExtent([0.3, 3])
+  .on("zoom", (e) => g.attr("transform", e.transform));
+svg.call(zoomBehavior);
+svg.call(zoomBehavior.transform, d3.zoomIdentity.translate(W / 2, H / 2).scale(0.75).translate(-W / 2, -H / 2));
+// Simulation
+const simulation = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(links).id(d => d.id).distance(120).strength(0.4))
+  .force("charge", d3.forceManyBody().strength(-500))
+  .force("center", d3.forceCenter(W / 2, H / 2))
+  .force("collision", d3.forceCollide().radius(d => {
+    const lines = d.label.split("\n");
+    const maxLen = Math.max(...lines.map(l => l.length));
+    const fs = d.size < 10 ? 7 : d.size < 14 ? 8 : 9;
+    const textHalfW = maxLen * fs * 0.34;
+    const textHalfH = lines.length * (fs + 2) / 2 + 4;
+    return Math.max(d.size + 20, textHalfW, textHalfH);
+  }))
+  .force("x", d3.forceX(W / 2).strength(0.05))
+  .force("y", d3.forceY(H / 2).strength(0.05));
+// Links
+const linkG = g.append("g");
+const linkLines = linkG.selectAll("line")
+  .data(links).join("line")
+  .attr("stroke", "#555").attr("stroke-opacity", 0.25).attr("stroke-width", 1.2);
+const linkLabels = linkG.selectAll("text")
+  .data(links.filter(l => l.label)).join("text")
+  .attr("class", "link-label")
+  .text(d => d.label.replace(/\n/g, " "))
+  .style("opacity", 0);
+// Nodes
+const nodeG = g.append("g");
+const nodeElements = nodeG.selectAll("g")
+  .data(nodes).join("g")
+  .style("cursor", d => d.url ? "pointer" : "grab");
+nodeElements.append("circle")
+  .attr("r", d => d.size)
+  .attr("fill", d => CATEGORIES[d.cat].color)
+  .attr("fill-opacity", 0.85)
+  .attr("stroke", d => CATEGORIES[d.cat].color)
+  .attr("stroke-width", 2)
+  .attr("stroke-opacity", 0.4);
+// Dashed outer ring for nodes with URLs
+nodeElements.filter(d => d.url).append("circle")
+  .attr("r", d => d.size + 3)
+  .attr("fill", "none")
+  .attr("stroke", "#58a6ff")
+  .attr("stroke-width", 1)
+  .attr("stroke-dasharray", "2,2")
+  .attr("stroke-opacity", 0.5);
+nodeElements.each(function(d) {
+  const el = d3.select(this);
+  const lines = d.label.split("\n");
+  const fs = d.size < 10 ? 7 : d.size < 14 ? 8 : 9;
+  lines.forEach((line, i) => {
+    el.append("text")
+      .text(line)
+      .attr("class", "node-label")
+      .attr("text-anchor", "middle")
+      .attr("dy", (i - (lines.length - 1) / 2) * (fs + 2) + 1)
+      .attr("font-size", fs + "px")
+      .attr("fill", "#fff")
+      .attr("stroke", CATEGORIES[d.cat].color)
+      .attr("stroke-width", 3);
+  });
+});
+// Drag (with click guard)
+let dragMoved = false;
+nodeElements.call(d3.drag()
+  .on("start", (e, d) => {
+    dragMoved = false;
+    if (!e.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x; d.fy = d.y;
+  })
+  .on("drag", (e, d) => {
+    dragMoved = true;
+    d.fx = e.x; d.fy = e.y;
+  })
+  .on("end", (e, d) => {
+    if (!e.active) simulation.alphaTarget(0);
+    d.fx = null; d.fy = null;
+  })
+);
+// Click to open URL
+nodeElements.on("click", function(e, d) {
+  if (dragMoved) return;
+  if (d.url) {
+    window.open(d.url, "_blank", "noopener");
+  }
+});
+// Helpers
+function getConnected(id) {
+  const s = new Set([id]);
+  links.forEach(l => {
+    const sId = typeof l.source === "object" ? l.source.id : l.source;
+    const tId = typeof l.target === "object" ? l.target.id : l.target;
+    if (sId === id) s.add(tId);
+    if (tId === id) s.add(sId);
+  });
+  return s;
+}
+const hoverInfo = document.getElementById("hover-info");
+const hoverName = hoverInfo.querySelector(".name");
+const hoverMeta = hoverInfo.querySelector(".meta");
+const hoverLink = hoverInfo.querySelector(".link-hint");
+// Hover
+nodeElements.on("mouseenter", function(e, d) {
+  const conn = getConnected(d.id);
+  const count = conn.size - 1;
+  hoverName.textContent = d.label.replace(/\n/g, " ");
+  hoverName.style.color = CATEGORIES[d.cat].color;
+  hoverMeta.textContent = `${CATEGORIES[d.cat].label} \u00b7 ${count} connection${count !== 1 ? "s" : ""}`;
+  hoverLink.textContent = d.url ? "Click to open source \u2197" : "";
+  hoverInfo.style.display = "block";
+  hoverInfo.style.borderColor = CATEGORIES[d.cat].color;
+  nodeElements.select("circle")
+    .attr("fill-opacity", n => conn.has(n.id) ? 1 : 0.08)
+    .attr("stroke-opacity", n => conn.has(n.id) ? 1 : 0.03)
+    .attr("filter", n => n.id === d.id ? "url(#glow)" : null);
+  nodeElements.selectAll("text")
+    .style("opacity", function() {
+      return conn.has(d3.select(this.parentNode).datum().id) ? 1 : 0.08;
+    });
+  linkLines
+    .attr("stroke-opacity", l => {
+      const s = typeof l.source === "object" ? l.source.id : l.source;
+      const t = typeof l.target === "object" ? l.target.id : l.target;
+      return (s === d.id || t === d.id) ? 0.7 : 0.03;
+    })
+    .attr("stroke-width", l => {
+      const s = typeof l.source === "object" ? l.source.id : l.source;
+      const t = typeof l.target === "object" ? l.target.id : l.target;
+      return (s === d.id || t === d.id) ? 2.5 : 1;
+    })
+    .attr("stroke", l => {
+      const s = typeof l.source === "object" ? l.source.id : l.source;
+      const t = typeof l.target === "object" ? l.target.id : l.target;
+      return (s === d.id || t === d.id) ? CATEGORIES[d.cat].color : "#555";
+    });
+  linkLabels.style("opacity", l => {
+    const s = typeof l.source === "object" ? l.source.id : l.source;
+    const t = typeof l.target === "object" ? l.target.id : l.target;
+    return (s === d.id || t === d.id) ? 1 : 0;
+  });
+});
+nodeElements.on("mouseleave", function() {
+  hoverInfo.style.display = "none";
+  nodeElements.select("circle")
+    .attr("fill-opacity", 0.85).attr("stroke-opacity", 0.4).attr("filter", null);
+  nodeElements.selectAll("text").style("opacity", 1);
+  linkLines.attr("stroke-opacity", 0.25).attr("stroke-width", 1.2).attr("stroke", "#555");
+  linkLabels.style("opacity", 0);
+});
+// Auto-fit viewport once simulation settles
+simulation.on("end", () => {
+  const xs = nodes.map(d => d.x), ys = nodes.map(d => d.y);
+  const pad = 80;
+  const x0 = Math.min(...xs) - pad, x1 = Math.max(...xs) + pad;
+  const y0 = Math.min(...ys) - pad, y1 = Math.max(...ys) + pad;
+  const bw = x1 - x0, bh = y1 - y0;
+  const scale = Math.min(W / bw, H / bh, 1.1);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  svg.transition().duration(600).call(
+    zoomBehavior.transform,
+    d3.zoomIdentity.translate(W / 2 - cx * scale, H / 2 - cy * scale).scale(scale)
+  );
+});
+// Tick
+simulation.on("tick", () => {
+  linkLines
+    .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+    .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+  linkLabels
+    .attr("x", d => (d.source.x + d.target.x) / 2)
+    .attr("y", d => (d.source.y + d.target.y) / 2);
+  nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
+});
+</script>
+</body>
+</html>
