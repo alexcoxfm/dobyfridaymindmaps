@@ -9,6 +9,12 @@ how they connect, and writes an interactive D3 mind map for the site.
 No audio download or transcription is needed: the archive already has a
 timestamped, speaker-labelled transcript for every episode.
 
+By default the topic step runs through Claude Code on this Mac (`claude -p`),
+using the Claude account you're signed in with, so no API key is needed and
+nothing goes to the billed API. API keys in your environment are removed for
+those calls. When Claude Code reports a usage limit, the script stops; run the
+same command again later and it skips episodes that already have a map.
+
 Usage:
     # Free check: fetch and parse transcripts, no Claude calls, no API key needed
     python generate_maps.py --episode 1 250 472 --dry-run
@@ -20,9 +26,12 @@ Usage:
     # Latest episode on the archive
     python generate_maps.py
 
-    # Every numbered episode on the archive. Without --yes this only prints
-    # the plan and a cost estimate. Episodes that already have a map are skipped.
-    python generate_maps.py --all --yes
+    # Every numbered episode on the archive (skips episodes that already have a map)
+    python generate_maps.py --all
+
+    # Use the billed Anthropic API instead of Claude Code (needs ANTHROPIC_API_KEY;
+    # --all then only prints a cost estimate unless you add --yes)
+    python generate_maps.py --episode 442 --engine api
 
     # Use your own transcript file for one episode
     python generate_maps.py --episode 442 --transcript path/to/transcript.txt
@@ -32,7 +41,8 @@ Usage:
 
 Requirements:
     pip install -r requirements.txt
-    export ANTHROPIC_API_KEY=sk-ant-...     (not needed for --dry-run)
+    Claude Code installed and signed in (run `claude` once)
+    Only for --engine api: pip install anthropic, export ANTHROPIC_API_KEY=...
 """
 
 import argparse
@@ -481,7 +491,98 @@ def rss_episode(feed, episode_number, whisper_model):
 
 
 # ---------------------------------------------------------------------------
-# Claude
+# Claude Code (default engine: runs on your Claude plan, no API key)
+# ---------------------------------------------------------------------------
+
+class UsageLimitReached(Exception):
+    """Claude Code says the plan's usage limit is used up; stop the whole run."""
+
+
+LIMIT_RE = re.compile(r"usage limit|limit reached|hit your limit|rate limit|out of (?:extra )?usage", re.I)
+
+# Environment variables that would make Claude Code bill an API account instead
+# of using the signed-in Claude plan. They are removed before each call.
+API_ENV_VARS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK",
+                "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_BASE_URL")
+
+
+def check_claude_code():
+    import shutil
+
+    if not shutil.which("claude"):
+        sys.exit("Claude Code isn't installed (no `claude` command found). "
+                 "Install it, run `claude` once to sign in with your Claude account, then try again.")
+    if any(os.environ.get(v) for v in API_ENV_VARS):
+        print("Note: API settings found in your environment (like ANTHROPIC_API_KEY). "
+              "They are removed for these Claude Code calls, so only your Claude plan is used.")
+
+
+def extract_topics_claude_code(transcript, episode_number, model):
+    """Ask Claude Code (`claude -p`, no tools) for the topic graph."""
+    import subprocess
+    import tempfile
+
+    cmd = [
+        "claude", "-p",
+        "--output-format", "json",
+        "--json-schema", json.dumps(GRAPH_SCHEMA),
+        "--tools", "",
+        "--strict-mcp-config",
+        "--no-session-persistence",
+        "--system-prompt", "You turn podcast transcripts into topic graphs. Reply only with the requested JSON.",
+    ]
+    if model:
+        cmd += ["--model", model]
+    prompt = (
+        f"<transcript episode=\"{episode_number}\">\n{transcript}\n</transcript>\n\n{EXTRACTION_PROMPT}"
+    )
+    env = {k: v for k, v in os.environ.items() if k not in API_ENV_VARS}
+
+    print("  Sending transcript to Claude Code for topic extraction...")
+    with tempfile.TemporaryDirectory() as workdir:  # empty folder: no project files or CLAUDE.md
+        try:
+            proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True,
+                                  env=env, cwd=workdir, timeout=30 * 60)
+        except subprocess.TimeoutExpired:
+            raise GenerationError("Claude Code took longer than 30 minutes, skipping.")
+
+    out = (proc.stdout or "").strip()
+    try:
+        result = json.loads(out)
+    except json.JSONDecodeError:
+        result = None
+
+    if not isinstance(result, dict):
+        detail = (proc.stderr or out or "no output").strip()[-400:]
+        if LIMIT_RE.search(detail):
+            raise UsageLimitReached(detail)
+        raise GenerationError(f"Claude Code failed (exit {proc.returncode}): {detail}")
+
+    text = str(result.get("result") or "")
+    if result.get("is_error") or proc.returncode != 0:
+        detail = (text or result.get("subtype") or proc.stderr or "unknown error").strip()[-400:]
+        if LIMIT_RE.search(detail):
+            raise UsageLimitReached(detail)
+        raise GenerationError(f"Claude Code reported an error: {detail}")
+
+    data = result.get("structured_output")
+    if data is None:
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as e:
+            debug_path = SCRIPT_DIR / f".debug_response_{episode_number}.txt"
+            debug_path.write_text(out)
+            raise GenerationError(f"Couldn't parse Claude Code's JSON ({e}); output saved to {debug_path.name}")
+
+    nodes = data.get("nodes", [])
+    links = data.get("links", [])
+    print(f"  Extracted {len(nodes)} topics and {len(links)} connections.")
+    return nodes, links
+
+
+# ---------------------------------------------------------------------------
+# Claude API (only with --engine api; billed to an API account)
 # ---------------------------------------------------------------------------
 
 def make_client():
@@ -657,13 +758,17 @@ def main():
     parser.add_argument("--episode", "-e", nargs="+",
                         help="Episode number(s) or ranges like 400-410 (default: latest)")
     parser.add_argument("--all", action="store_true", help="Every numbered episode on the archive")
-    parser.add_argument("--yes", action="store_true", help="Confirm an --all run that calls Claude")
+    parser.add_argument("--engine", default="claude-code", choices=["claude-code", "api"],
+                        help="claude-code = Claude Code on this Mac, signed in with your Claude plan (default); "
+                             "api = the billed Anthropic API (needs ANTHROPIC_API_KEY)")
+    parser.add_argument("--yes", action="store_true", help="Confirm an --all run on the billed API")
     parser.add_argument("--dry-run", action="store_true", help="Fetch and check transcripts only; no Claude calls")
     parser.add_argument("--force", action="store_true", help="Remake maps that already exist")
     parser.add_argument("--refresh", action="store_true", help="Re-download transcripts even if cached")
-    parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Claude model (default: {DEFAULT_MODEL})")
+    parser.add_argument("--model", help="Claude model (default: Claude Code's own default; "
+                                         f"{DEFAULT_MODEL} with --engine api)")
     parser.add_argument("--effort", default="medium", choices=["low", "medium", "high", "xhigh", "max"],
-                        help="How hard Claude thinks (default: medium)")
+                        help="How hard Claude thinks, --engine api only (default: medium)")
     parser.add_argument("--source", default="archive", choices=["archive", "rss"],
                         help="archive = transcripts from the DBF Archives site (default); "
                              "rss = download audio and run Whisper")
@@ -671,6 +776,8 @@ def main():
     parser.add_argument("--whisper-model", "-w", default="medium",
                         choices=["tiny", "base", "small", "medium", "large"], help="Whisper model for --source rss")
     args = parser.parse_args()
+    if args.engine == "api" and not args.model:
+        args.model = DEFAULT_MODEL
 
     if not TEMPLATE_PATH.exists() or not EPISODES_JSON.exists():
         sys.exit("Run this from the dobyfridaymindmaps folder "
@@ -709,7 +816,7 @@ def main():
         return
 
     print(f"Episodes to process: {len(episodes)} ({episodes[0]}–{episodes[-1]})")
-    if args.all and not args.dry_run and not args.yes:
+    if args.engine == "api" and args.all and not args.dry_run and not args.yes:
         price_in, price_out = PRICES.get(args.model, PRICES[DEFAULT_MODEL])
         low = len(episodes) * (12_000 * price_in + 8_000 * price_out) / 1e6
         high = len(episodes) * (20_000 * price_in + 20_000 * price_out) / 1e6
@@ -717,8 +824,13 @@ def main():
         print("Nothing was sent. Add --yes to run it, or --dry-run to check the transcripts for free.")
         return
 
-    client = None if args.dry_run else make_client()
-    done, failed, total_cost = 0, [], 0.0
+    client = None
+    if not args.dry_run:
+        if args.engine == "api":
+            client = make_client()
+        else:
+            check_claude_code()
+    done, failed, total_cost, streak = 0, [], 0.0, 0
 
     for n in episodes:
         print(f"\n{'=' * 60}\nEpisode #{n}\n{'=' * 60}")
@@ -743,19 +855,33 @@ def main():
 
             if args.dry_run:
                 done += 1
+                streak = 0
                 continue
 
-            nodes, links, cost = extract_topics(client, text, n, args.model, args.effort)
-            total_cost += cost
+            if args.engine == "api":
+                nodes, links, cost = extract_topics(client, text, n, args.model, args.effort)
+                total_cost += cost
+            else:
+                nodes, links = extract_topics_claude_code(text, n, args.model)
             nodes, links = validate_graph(nodes, links)
             if not nodes:
                 raise GenerationError("Claude returned no topics.")
             generate_html(nodes, links, n)
             update_episodes_json(n, meta["title"], meta.get("date", ""), nodes)
             done += 1
+            streak = 0
         except GenerationError as e:
             print(f"  Failed: {e}", file=sys.stderr)
             failed.append(n)
+            streak += 1
+            if streak >= 3:
+                print("Three episodes in a row failed, so I'm stopping here. Check the errors above.")
+                break
+        except UsageLimitReached as e:
+            print(f"\n  Claude Code says your usage limit is reached: {e}")
+            print("Stopped here. Maps made so far are saved. Run the same command again after your")
+            print("limit resets; it skips episodes that already have a map.")
+            break
         except KeyboardInterrupt:
             print("\nStopped. Finished maps are kept; rerun the same command to pick up where you left off.")
             break
@@ -764,7 +890,8 @@ def main():
     verb = "checked" if args.dry_run else "mapped"
     print(f"Finished: {done} {verb}, {len(failed)} failed{f' ({failed})' if failed else ''}.")
     if not args.dry_run:
-        print(f"Estimated Claude cost this run: ${total_cost:.2f}")
+        if args.engine == "api":
+            print(f"Estimated Claude API cost this run: ${total_cost:.2f}")
         if done:
             print("Preview: python3 -m http.server 8000  →  http://localhost:8000")
     print("=" * 60)
