@@ -1,0 +1,13 @@
+# Audio cache (large mp3 files)
+.audio_cache/
+
+# Transcripts cache
+.transcripts/
+
+# Debug output from Claude responses
+.debug_response_*.txt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
