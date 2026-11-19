@@ -1,0 +1,6 @@
+anthropic>=2.11
+requests>=2.31
+
+# Only for the old audio pipeline (--source rss):
+# feedparser>=6.0
+# openai-whisper>=20231117

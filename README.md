@@ -21,6 +21,27 @@ Built with [D3.js](https://d3js.org). Hosted on GitHub Pages.
 
 4. Commit and push. The landing page picks it up automatically.
 
+## Making maps automatically
+
+`generate_maps.py` reads each episode's transcript from the [Do By Friday Archives](https://dobyfridayarchives.pages.dev), asks Claude for the topics and connections, and writes `episodes/{number}.html` plus its `episodes.json` entry.
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# Free check: fetch and parse transcripts, no API key needed
+python generate_maps.py --episode 1 250 472 --dry-run
+
+# Make maps (needs ANTHROPIC_API_KEY)
+export ANTHROPIC_API_KEY=sk-ant-...
+python generate_maps.py --episode 470-472
+
+# Every episode: prints the plan and a cost estimate; add --yes to run it
+python generate_maps.py --all
+```
+
+Episodes that already have a map are skipped unless you pass `--force`. Transcripts are cached in `.transcripts/`. `--model claude-sonnet-5-5` costs about half as much as the default.
+
 ## Local preview
 
 The landing page uses `fetch()` to load `episodes.json`, so it needs to be served over HTTP:
